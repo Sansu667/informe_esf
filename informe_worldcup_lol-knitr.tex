@@ -49,12 +49,19 @@
 \newenvironment{knitrout}{}{} % an empty environment to be redefined in TeX
 
 \usepackage{alltt}
-\usepackage[margin=2.5cm]{geometry} % Ajuste de márgenes
-\usepackage{graphicx} 
-\usepackage{hyperref} % Enlaces en referencias o URLs
+\usepackage[utf8]{inputenc}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{float}
 
-\title{Informe del World Cup 2024 de League of Legends}
-\author{Edgar Santiago Suárez Alzate}
+\renewcommand{\tablename}{Tabla}
+\renewcommand{\figurename}{Figura}
+\renewcommand{\contentsname}{Contenido}
+
+\title{Análisis del Desempeño de Bilibili Gaming en el World Championship 2024 de League of Legends}
+\author{Edgar Santiago Suarez Alzate...}
 \date{\today}
 \IfFileExists{upquote.sty}{\usepackage{upquote}}{}
 \begin{document}
@@ -65,44 +72,113 @@
 
 
 
-
 \begin{knitrout}
 \definecolor{shadecolor}{rgb}{0.969, 0.969, 0.969}\color{fgcolor}\begin{kframe}
-
-
-{\ttfamily\noindent\itshape\color{messagecolor}{\#\# Rows: 81 Columns: 27\\\#\# -- Column specification --------------------------------------------------------\\\#\# Delimiter: "{},"{}\\\#\# chr \ (6): TeamName, PlayerName, Position, Solo Kills, Country, FlashKeybind\\\#\# dbl (21): Games, Win rate, KDA, Avg kills, Avg deaths, Avg assists, CSPerMin...\\\#\# \\\#\# i Use `spec()` to retrieve the full column specification for this data.\\\#\# i Specify the column types or set `show\_col\_types = FALSE` to quiet this message.}}\end{kframe}
+\begin{verbatim}
+##  [1] "TeamName"      "PlayerName"    "Position"      "Games"        
+##  [5] "Win_rate"      "KDA"           "Avg_kills"     "Avg_deaths"   
+##  [9] "Avg_assists"   "CSPerMin"      "GoldPerMin"    "KPPercent"    
+## [13] "DamagePercent" "DPM"           "VSPM"          "Avg_WPM"      
+## [17] "Avg_WCPM"      "Avg_VWPM"      "GD_15"         "CSD_15"       
+## [21] "XPD_15"        "FBPercent"     "FB_Victim"     "Penta_Kills"  
+## [25] "Solo_Kills"    "Country"       "FlashKeybind"
+\end{verbatim}
+\end{kframe}
 \end{knitrout}
 
 
 
-\section{Introducción}
-  En este informe, tenemos el objetivo de evaluar por qué el equipo \textit{Bilibili Gaming} no fue campeón mundial de League of Legends. 
-  Para esto necesitaremos dividir nuestro informe en dos partes:
 
-  \begin{enumerate}
-    \item Un análisis descriptivo de la base de datos llamada \texttt{player\_statistics\_cleaned\_final.csv}.
-    \item Un análisis predictivo, en donde daremos respuesta al objetivo general a partir de los datos.
-  \end{enumerate}
+
+\section{Introducción}
+El World Championship 2024 de League of Legends representó uno de los torneos más competitivos de los esports a nivel mundial. Este informe se centra en analizar los factores que pudieron influir en que \textit{Bilibili Gaming} no lograra obtener el campeonato mundial. 
 
 \section{Análisis descriptivo}
-  Para empezar este análisis descriptivo considero que se debe empezar haciendo un análisis general de cómo está compuesta la tabla. La tabla está compuesta por 81 observaciones, que quiere decir que hay \textbf{81 jugadores} de diferentes equipos que participaron en el campeonato mundial de League Of Legends 2024. Respecto a las variables que contiene la base de datos se puede observar \textbf{27 variables}. Sin embargo, para este informe no se necesitarán las 27 variables, tanto por cuestión de extensión como de tiempo. Por lo anterior, haremos una recolección de 10 variables para hacer nuestro análisis y que consideramos son útiles para conseguir nuestro objetivo.
 
-  Las variables que tendremos en cuenta serán:
-  \begin{enumerate}
-    \item \textit{TeamName}, la cual consiste en el nombre del team que participó en el campeonato mundial.
-    \item \textit{PlayerName}, la cual consiste en el nombre del jugador que partició en el campeonato mundial.
-    \item \textit{Position}, la cual consiste en la posición del jugador en las partidas. Se debe tener en cuenta que existen cinco posiciones: Top, Jungle, Adc, Support y Mid.
-    \item \textit{Games}, la cual consiste en el total de las partidas jugadas.
-    \item \textit{Win rate}, la cual consiste en la tasa de partidas ganadas del jugador en porcentaje .
-    \item \textit{KDA}, la cual consiste en la tasa de Eliminación-Muerte-Asistencia, que indica el equilibrio del rendimiento.
-    \item \textit{Avg kills}, 
-    \item \textit{Avg deaths}, 
-    \item \textit{Avg assits},
-    \item \textit{Gold Per Min},
-    \item \textit{Damage Percent},
-    \item \textit{Country}
-  \end{enumerate}
+\subsection{Descripción general de los datos}
+La base de datos analizada contiene información de \textbf{81} jugadores profesionales de \textbf{16} equipos y \textbf{27} variables. Pero antes de continuar es bueno explicar en qué consiste las 12 variables que son importantes para nuestro proposito:
+\begin{enumerate}
+  \item \textit{TeamName}: Nombre del equipo participante
+  \item \textit{PlayerName}: Identificador único del jugador
+  \item \textit{Position}: Rol (Top, Jungle, Mid, Adc, Support)
+  \item \textit{Games}: Total de partidas disputadas
+  \item \textit{Win\_rate}: Tasa de victorias (0-1)
+  \item \textit{KDA}: Ratio (Kills + Assists) / Deaths 
+  \item \textit{Avg\_kills}: Promedio de eliminaciones 
+  \item \textit{Avg\_deaths}: Promedio de muertes 
+  \item \textit{Avg\_assists}: Promedio de asistencias 
+  \item \textit{GoldPerMin}: Oro por minuto
+  \item \textit{DamagePercent}: \% del daño del equipo
+  \item \textit{Country}: País de origen
+\end{enumerate}
 
-  
+\subsection{Estadísticas descriptivas por equipo}
+\begin{knitrout}
+\definecolor{shadecolor}{rgb}{0.969, 0.969, 0.969}\color{fgcolor}\begin{table}[!h]
+\centering
+\caption{\label{tab:estadisticas_equipos}Top 10 equipos por tasa de victoria}
+\centering
+\resizebox{\ifdim\width>\linewidth\linewidth\else\width\fi}{!}{
+\begin{tabular}[t]{lrrrrr}
+\toprule
+Equipo & N. de Jugadores & Win Rate & KDA & GPM & Dmg \%\\
+\midrule
+T1 & 5 & 0.88 & 7.06 & 391.8 & 0.20\\
+Gen.G & 5 & 0.70 & 5.94 & 376.4 & 0.20\\
+Bilibili Gaming & 6 & 0.63 & 4.12 & 370.5 & 0.19\\
+LNG Esports & 5 & 0.62 & 5.42 & 379.2 & 0.20\\
+Weibo Gaming & 5 & 0.62 & 4.70 & 372.8 & 0.20\\
+\addlinespace
+FlyQuest & 5 & 0.50 & 3.94 & 359.4 & 0.20\\
+Hanwha Life Esports & 5 & 0.50 & 3.50 & 366.8 & 0.20\\
+Team Liquid & 5 & 0.50 & 3.44 & 370.4 & 0.20\\
+Top Esports & 5 & 0.50 & 3.52 & 356.6 & 0.20\\
+G2 Esports & 5 & 0.38 & 3.34 & 370.6 & 0.20\\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\end{knitrout}
+
+\subsection{Análisis de Bilibili Gaming}
+\begin{table}[!h]
+\centering
+\caption{\label{tab:stats_bilibili}Estadísticas de Bilibili Gaming}
+\centering
+\begin{tabular}[t]{rrrrrr}
+\toprule
+Jugadores & WinRate & KDA & Kills & Deaths & GPM\\
+\midrule
+6 & 0.63 & 4.12 & 3.03 & 3.05 & 370.5\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+
+\subsection{Análisis por posición}
+\begin{knitrout}
+\definecolor{shadecolor}{rgb}{0.969, 0.969, 0.969}\color{fgcolor}\begin{figure}[H]
+
+{\centering \includegraphics[width=\maxwidth]{figure/grafico_posiciones-1} 
+
+}
+
+\caption[KDA por posición]{KDA por posición}\label{fig:grafico_posiciones}
+\end{figure}
+
+\end{knitrout}
+
+\begin{knitrout}
+\definecolor{shadecolor}{rgb}{0.969, 0.969, 0.969}\color{fgcolor}\begin{figure}[H]
+
+{\centering \includegraphics[width=\maxwidth]{figure/grafico_winrate_gpm-1} 
+
+}
+
+\caption[Win Rate vs Gold Per Min]{Win Rate vs Gold Per Min}\label{fig:grafico_winrate_gpm}
+\end{figure}
+
+\end{knitrout}
 
 \end{document}

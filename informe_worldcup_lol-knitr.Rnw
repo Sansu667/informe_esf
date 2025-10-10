@@ -1,10 +1,17 @@
 \documentclass{article}
-\usepackage[margin=2.5cm]{geometry} % Ajuste de márgenes
-\usepackage{graphicx} 
-\usepackage{hyperref} % Enlaces en referencias o URLs
+\usepackage[utf8]{inputenc}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{float}
 
-\title{Informe del World Cup 2024 de League of Legends}
-\author{Edgar Santiago Suárez Alzate}
+\renewcommand{\tablename}{Tabla}
+\renewcommand{\figurename}{Figura}
+\renewcommand{\contentsname}{Contenido}
+
+\title{Análisis del Desempeño de Bilibili Gaming en el World Championship 2024 de League of Legends}
+\author{Edgar Santiago Suarez Alzate...}
 \date{\today}
 
 \begin{document}
@@ -14,56 +21,139 @@
 <<include=FALSE>>=
 library(knitr)
 opts_chunk$set(
-concordance=TRUE
+  concordance=TRUE,
+  echo=FALSE,
+  warning=FALSE,
+  message=FALSE,
+  fig.align='center',
+  fig.pos='H'
 )
 @
 
-
 <<setup, include=FALSE>>=
 library(readr)
+library(dplyr)
+library(ggplot2)
+library(kableExtra)
 @
 
-<<importar_datos, echo=FALSE>>=
-player_statistics_cleaned_final <- read_csv("C:/Users/Lenovo/OneDrive/Documentos/informe1/player_statistics_cleaned_final.csv")
+<<importar_datos>>=
+# Leer el archivo CSV
+datos <- read.csv("player_statistics_cleaned_final.csv", header = TRUE, stringsAsFactors = FALSE)
+
+# Limpieza de nombres
+names(datos) <- gsub("\\.", "_", names(datos))
+names(datos) <- gsub("%", "Percent", names(datos))
+
+names(datos)[names(datos) == "KP_"] <- "KPPercent"
+names(datos)[names(datos) == "FB__"] <- "FBPercent"
+
+# Verificación
+print(names(datos))
 @
 
-<<cambiar_tipos, echo=FALSE>>=
-player_statistics_cleaned_final$TeamName <- as.factor(player_statistics_cleaned_final$TeamName)
-player_statistics_cleaned_final$PlayerName <- as.factor(player_statistics_cleaned_final$PlayerName)
-player_statistics_cleaned_final$Position <- as.factor(player_statistics_cleaned_final$Position)
-player_statistics_cleaned_final$`Solo Kills` <- as.factor(player_statistics_cleaned_final$`Solo Kills`)
-player_statistics_cleaned_final$Country <- as.factor(player_statistics_cleaned_final$Country)
-player_statistics_cleaned_final$FlashKeybind <- as.factor(player_statistics_cleaned_final$FlashKeybind)
+<<procesamiento_datos>>=
+# Conversión de tipos de datos
+datos <- datos %>%
+  mutate(
+    TeamName = as.factor(TeamName),
+    PlayerName = as.factor(PlayerName),
+    Position = factor(Position, levels = c("Top", "Jungle", "Mid", "Adc", "Support")),
+    Games = as.numeric(Games),
+    Win_rate = as.numeric(Win_rate),
+    KDA = as.numeric(KDA),
+    Avg_kills = as.numeric(Avg_kills),
+    Avg_deaths = as.numeric(Avg_deaths),
+    Avg_assists = as.numeric(Avg_assists),
+    GoldPerMin = as.numeric(GoldPerMin),
+    KPPercent = as.numeric(KPPercent),
+    DamagePercent = as.numeric(DamagePercent)
+  )
+@
+
+<<resumen_estructura>>=
+n_jugadores <- nrow(datos)
+n_variables <- ncol(datos)
+n_equipos <- length(unique(datos$TeamName))
 @
 
 \section{Introducción}
-  En este informe, tenemos el objetivo de evaluar por qué el equipo \textit{Bilibili Gaming} no fue campeón mundial de League of Legends. 
-  Para esto necesitaremos dividir nuestro informe en dos partes:
-
-  \begin{enumerate}
-    \item Un análisis descriptivo de la base de datos llamada \texttt{player\_statistics\_cleaned\_final.csv}.
-    \item Un análisis predictivo, en donde daremos respuesta al objetivo general a partir de los datos.
-  \end{enumerate}
+El World Championship 2024 de League of Legends representó uno de los torneos más competitivos de los esports a nivel mundial. Este informe se centra en analizar los factores que pudieron influir en que \textit{Bilibili Gaming} no lograra obtener el campeonato mundial. 
 
 \section{Análisis descriptivo}
-  Para empezar este análisis descriptivo considero que se debe empezar haciendo un análisis general de cómo está compuesta la tabla. La tabla está compuesta por 81 observaciones, que quiere decir que hay \textbf{81 jugadores} de diferentes equipos que participaron en el campeonato mundial de League Of Legends 2024. Respecto a las variables que contiene la base de datos se puede observar \textbf{27 variables}. Sin embargo, para este informe no se necesitarán las 27 variables, tanto por cuestión de extensión como de tiempo. Por lo anterior, haremos una recolección de 10 variables para hacer nuestro análisis y que consideramos son útiles para conseguir nuestro objetivo.
 
-  Las variables que tendremos en cuenta serán:
-  \begin{enumerate}
-    \item \textit{TeamName}, la cual consiste en el nombre del team que participó en el campeonato mundial.
-    \item \textit{PlayerName}, la cual consiste en el nombre del jugador que partició en el campeonato mundial.
-    \item \textit{Position}, la cual consiste en la posición del jugador en las partidas. Se debe tener en cuenta que existen cinco posiciones: Top, Jungle, Adc, Support y Mid.
-    \item \textit{Games}, la cual consiste en el total de las partidas jugadas.
-    \item \textit{Win rate}, la cual consiste en la tasa de partidas ganadas del jugador en porcentaje .
-    \item \textit{KDA}, la cual consiste en la tasa de Eliminación-Muerte-Asistencia, que indica el equilibrio del rendimiento.
-    \item \textit{Avg kills}, 
-    \item \textit{Avg deaths}, 
-    \item \textit{Avg assits},
-    \item \textit{Gold Per Min},
-    \item \textit{Damage Percent},
-    \item \textit{Country}
-  \end{enumerate}
+\subsection{Descripción general de los datos}
+La base de datos analizada contiene información de \textbf{\Sexpr{n_jugadores}} jugadores profesionales de \textbf{\Sexpr{n_equipos}} equipos y \textbf{\Sexpr{n_variables}} variables. Pero antes de continuar es bueno explicar en qué consiste las 12 variables que son importantes para nuestro proposito:
+\begin{enumerate}
+  \item \textit{TeamName}: Nombre del equipo participante
+  \item \textit{PlayerName}: Identificador único del jugador
+  \item \textit{Position}: Rol (Top, Jungle, Mid, Adc, Support)
+  \item \textit{Games}: Total de partidas disputadas
+  \item \textit{Win\_rate}: Tasa de victorias (0-1)
+  \item \textit{KDA}: Ratio (Kills + Assists) / Deaths 
+  \item \textit{Avg\_kills}: Promedio de eliminaciones 
+  \item \textit{Avg\_deaths}: Promedio de muertes 
+  \item \textit{Avg\_assists}: Promedio de asistencias 
+  \item \textit{GoldPerMin}: Oro por minuto
+  \item \textit{DamagePercent}: \% del daño del equipo
+  \item \textit{Country}: País de origen
+\end{enumerate}
 
-  
+\subsection{Estadísticas descriptivas por equipo}
+<<estadisticas_equipos>>=
+team_stats <- datos %>%
+  group_by(TeamName) %>%
+  summarise(
+    N = n(),
+    WinRate_Mean = mean(Win_rate, na.rm = TRUE),
+    KDA_Mean = mean(KDA, na.rm = TRUE),
+    GPM_Mean = mean(GoldPerMin, na.rm = TRUE),
+    DamagePercent_Mean = mean(DamagePercent, na.rm = TRUE),
+    .groups = 'drop'
+  ) %>%
+  arrange(desc(WinRate_Mean))
+
+kable(head(team_stats, 10),
+      format = "latex", booktabs = TRUE, digits = 2,
+      col.names = c("Equipo", "N. de Jugadores", "Win Rate", "KDA", "GPM", "Dmg %"),
+      caption = "Top 10 equipos por tasa de victoria") %>%
+  kable_styling(latex_options = c("hold_position", "scale_down"))
+@
+
+\subsection{Análisis de Bilibili Gaming}
+<<stats_bilibili, results='asis'>>=
+bilibili_tabla <- datos %>%
+  filter(TeamName == "Bilibili Gaming") %>%
+  summarise(
+    Jugadores = n(),
+    WinRate = mean(Win_rate, na.rm = TRUE),
+    KDA = mean(KDA, na.rm = TRUE),
+    Kills = mean(Avg_kills, na.rm = TRUE),
+    Deaths = mean(Avg_deaths, na.rm = TRUE),
+    GPM = mean(GoldPerMin, na.rm = TRUE)
+  )
+
+kable(bilibili_tabla, format = "latex", booktabs = TRUE, digits = 2,
+      caption = "Estadísticas de Bilibili Gaming") %>%
+  kable_styling(latex_options = "hold_position")
+@
+
+\subsection{Análisis por posición}
+<<grafico_posiciones, fig.cap="KDA por posición", fig.height=3, fig.width=5>>=
+ggplot(datos, aes(x = Position, y = KDA, fill = Position)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(x = "Posición", y = "KDA") +
+  theme(legend.position = "none")
+@
+
+<<grafico_winrate_gpm, fig.cap="Win Rate vs Gold Per Min", fig.height=3, fig.width=5>>=
+ggplot(datos, aes(x = GoldPerMin, y = Win_rate, color = Position)) +
+  geom_point(size = 2.5, alpha = 0.7) +
+  geom_smooth(method = "lm", se = TRUE, color = "black", linetype = "dashed") +
+  theme_minimal() +
+  labs(x = "Gold Per Min", y = "Win Rate", color = "Posición") +
+  theme(legend.position = "bottom")
+@
 
 \end{document}
