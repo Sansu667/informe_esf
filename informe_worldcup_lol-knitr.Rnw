@@ -40,22 +40,19 @@ library(gridExtra)
 @
 
 <<importar_datos>>=
-# Leer el archivo CSV
 datos <- read.csv("player_statistics_cleaned_final.csv", header = TRUE, stringsAsFactors = FALSE)
 
-# Limpieza de nombres
 names(datos) <- gsub("\\.", "_", names(datos))
 names(datos) <- gsub("%", "Percent", names(datos))
 
 names(datos)[names(datos) == "KP_"] <- "KPPercent"
 names(datos)[names(datos) == "FB__"] <- "FBPercent"
 
-# Verificación
+
 print(names(datos))
 @
 
 <<procesamiento_datos>>=
-# Conversión de tipos de datos
 datos <- datos %>%
   mutate(
     TeamName = as.factor(TeamName),
@@ -193,7 +190,6 @@ Esta métrica cuantifica cuánto daño aporta un jugador por cada unidad de oro 
 <<analisis_eficiencia, results='asis'>>=
 datos <- datos %>% mutate(Efficiency = (DamagePercent / GoldPerMin) * 1000)
 
-# Comparación BLG vs Global en Eficiencia
 test_eff <- t.test(datos$Efficiency[datos$TeamName == "Bilibili Gaming"], mu = mean(datos$Efficiency, na.rm=TRUE))
 
 cat("\\begin{itemize}\n")
@@ -239,7 +235,7 @@ ggplot(ci_data, aes(x = Metric, y = Mean_Global)) +
   geom_point(size = 3, shape = 21, fill = "white") + # Media Global
   geom_point(aes(y = BLG_Mean), size = 4, color = "red", shape = 18) + # BLG
   theme_minimal() +
-  theme(axis.text.x = element_blank()) + # Eliminar texto redundante del eje X
+  theme(axis.text.x = element_blank()) + 
   labs(y = "Valor Promedio", x = "", title = "Global (Barras) vs BLG (Punto Rojo)") +
   facet_wrap(~Metric, scales = "free_y")
 @
@@ -251,7 +247,6 @@ $$ \text{Win\_rate} = \beta_0 + \beta_1 \cdot \text{KDA} + \beta_2 \cdot \text{G
 <<regresion_diagnostico, fig.cap="Diagnóstico del modelo: Residuos y normalidad", fig.height=4, fig.width=8, results='asis'>>=
 model_final <- lm(Win_rate ~ KDA + GoldPerMin + Efficiency, data = datos)
 
-# Tabla de coeficientes
 coefs <- summary(model_final)$coefficients
 df_coefs <- data.frame(
   Estimado = coefs[,1],
@@ -262,13 +257,11 @@ df_coefs <- data.frame(
 kable(df_coefs, format = "latex", booktabs = TRUE, digits = 4, caption = "Coeficientes del Modelo Final") %>%
   kable_styling(latex_options = "hold_position")
 
-# Datos para gráficos con ggplot2
 diag_data <- data.frame(
   Fitted = fitted(model_final),
   Residuals = resid(model_final)
 )
 
-# 1. Residuos vs Ajustados (Homocedasticidad)
 p1 <- ggplot(diag_data, aes(x = Fitted, y = Residuals)) +
   geom_point(alpha = 0.6, color = "blue") +
   geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
@@ -276,7 +269,6 @@ p1 <- ggplot(diag_data, aes(x = Fitted, y = Residuals)) +
   labs(title = "Residuos vs Valores ajustados", x = "Valores ajustados", y = "Residuos") +
   theme_minimal()
 
-# 2. Q-Q Plot (Normalidad)
 p2 <- ggplot(diag_data, aes(sample = Residuals)) +
   stat_qq(color = "blue", alpha = 0.6) +
   stat_qq_line(color = "red", linetype = "dashed") +
@@ -308,7 +300,6 @@ Finalmente, realizamos una prueba ANOVA para verificar si la posición del jugad
 anova_model <- aov(GoldPerMin ~ Position, data = datos)
 anova_res <- summary(anova_model)[[1]]
 
-# Crear tabla manual para kable
 df_anova <- data.frame(
   Fuente = c("Posición", "Residuales"),
   Df = anova_res$Df,
@@ -318,10 +309,8 @@ df_anova <- data.frame(
   P_Value = c(format.pval(anova_res$`Pr(>F)`[1], digits=4, eps=0.0001), "")
 )
 
-# Renombrar columnas para evitar guiones bajos (que rompen LaTeX con escape=FALSE)
 colnames(df_anova) <- c("Fuente", "Df", "Sum Sq", "Mean Sq", "F Value", "P Value")
 
-# Corregir el símbolo < para LaTeX (evitar que salga como ¡)
 df_anova$`P Value` <- gsub("<", "$<$", df_anova$`P Value`)
 
 kable(df_anova, format = "latex", booktabs = TRUE, caption = "Tabla ANOVA: Oro por Posición", escape = FALSE) %>%
