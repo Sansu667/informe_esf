@@ -5,13 +5,14 @@
 \usepackage{hyperref}
 \usepackage{booktabs}
 \usepackage{float}
+\usepackage{amsmath}
 
 \renewcommand{\tablename}{Tabla}
 \renewcommand{\figurename}{Figura}
 \renewcommand{\contentsname}{Contenido}
 
-\title{Análisis del Desempeño de Bilibili Gaming en el World Championship 2024 de League of Legends}
-\author{Edgar Santiago Suarez Alzate...}
+\title{\textbf{Análisis del desempeño de Bilibili Gaming en el World Championship 2024 de League of Legends}}
+\author{Valentina Fonseca, Cristian Pérez, Edgar Santiago Suarez Alzate}
 \date{\today}
 
 \begin{document}
@@ -35,6 +36,7 @@ library(readr)
 library(dplyr)
 library(ggplot2)
 library(kableExtra)
+library(gridExtra)
 @
 
 <<importar_datos>>=
@@ -78,6 +80,7 @@ n_equipos <- length(unique(datos$TeamName))
 @
 
 \section{Introducción}
+
 El World Championship 2024 de League of Legends representó uno de los torneos más competitivos de los esports a nivel mundial. Este informe se centra en analizar los factores que pudieron influir en que \textit{Bilibili Gaming} no lograra obtener el campeonato mundial. 
 
 \section{Análisis descriptivo}
@@ -147,6 +150,8 @@ ggplot(datos, aes(x = Position, y = KDA, fill = Position)) +
   theme(legend.position = "none")
 @
 
+El diagrama box plot evidencia diferencias en el rendimiento entre posiciones. Los jugadores de Mid y Adc presentan los valores medianos de KDA más altos, indicando una mayor eficiencia en eliminaciones y asistencias respecto a muertes. En contraste, Top y Support muestran desempeños más modestos, aunque con menor dispersión, lo que sugiere una función más estable y menos dependiente de las estadísticas ofensivas.
+
 <<grafico_winrate_gpm, fig.cap="Win Rate vs Gold Per Min", fig.height=3, fig.width=5>>=
 ggplot(datos, aes(x = GoldPerMin, y = Win_rate, color = Position)) +
   geom_point(size = 2.5, alpha = 0.7) +
@@ -154,6 +159,180 @@ ggplot(datos, aes(x = GoldPerMin, y = Win_rate, color = Position)) +
   theme_minimal() +
   labs(x = "Gold Per Min", y = "Win Rate", color = "Posición") +
   theme(legend.position = "bottom")
+@
+
+Se aprecia una asociación positiva débil entre el oro por minuto y la tasa de victorias: la línea de tendencia es ascendente pero de baja pendiente. No obstante, existen excepciones notables (por ejemplo, varios Supports con bajo GPM y alto Win Rate) y la relación varía según la posición. Estas observaciones indican que, si bien la eficiencia económica contribuye al éxito, no explica por sí sola las victorias y su efecto es heterogéneo entre roles.
+
+\section{Análisis inferencial}
+
+\subsection{Diagnóstico visual de distribuciones}
+Para validar la robustez de nuestros análisis, inspeccionamos visualmente la distribución de las variables críticas (\textit{KDA} y \textit{GoldPerMin}) comparándolas con una curva normal teórica.
+
+<<distribucion_visual, fig.cap="Distribución de KDA y Gold Per Min con Curva Normal", fig.height=4, fig.width=8>>=
+plot_dist <- function(data, var_name, title) {
+  ggplot(data, aes_string(x = var_name)) +
+    geom_histogram(aes(y = ..density..), bins = 30, fill = "skyblue", color = "white", alpha = 0.7) +
+    stat_function(fun = dnorm, args = list(mean = mean(data[[var_name]], na.rm=TRUE), sd = sd(data[[var_name]], na.rm=TRUE)), color = "red", size = 1) +
+    theme_minimal() +
+    labs(title = title, y = "Densidad", x = var_name)
+}
+
+p1 <- plot_dist(datos, "KDA", "Distribución de KDA")
+p2 <- plot_dist(datos, "GoldPerMin", "Distribución de GPM")
+
+grid.arrange(p1, p2, ncol = 2)
+@
+
+Visualmente, el \textit{KDA} muestra una ligera asimetría positiva (cola a la derecha), común en métricas de rendimiento donde unos pocos jugadores destacan mucho. El \textit{GoldPerMin} parece ajustarse mejor a la normalidad.
+
+\subsection{Análisis de eficiencia de recursos}
+Introducimos una nueva métrica: \textbf{eficiencia de recursos} ($E_R$). A partir de ahora utilizaremos este factor como \textbf{Efficiency}.
+$$ E_R = \frac{\text{DamagePercent}}{\text{GoldPerMin}} \times 1000 $$
+Esta métrica cuantifica cuánto daño aporta un jugador por cada unidad de oro que consume. Un valor alto indica un jugador que hace "más con menos", optimizando la economía del equipo.
+
+<<analisis_eficiencia, results='asis'>>=
+datos <- datos %>% mutate(Efficiency = (DamagePercent / GoldPerMin) * 1000)
+
+# Comparación BLG vs Global en Eficiencia
+test_eff <- t.test(datos$Efficiency[datos$TeamName == "Bilibili Gaming"], mu = mean(datos$Efficiency, na.rm=TRUE))
+
+cat("\\begin{itemize}\n")
+cat(paste0("\\item \\textbf{Eficiencia promedio global:} ", round(mean(datos$Efficiency, na.rm=TRUE), 2), "\n"))
+cat(paste0("\\item \\textbf{Eficiencia promedio BLG:} ", round(mean(datos$Efficiency[datos$TeamName == "Bilibili Gaming"], na.rm=TRUE), 2), "\n"))
+cat(paste0("\\item \\textbf{P-valor de la diferencia:} ", round(test_eff$p.value, 4), "\n"))
+cat("\\end{itemize}\n")
+
+cat("\n")
+if(test_eff$p.value < 0.05) {
+  cat("Bilibili Gaming muestra una eficiencia de recursos estadísticamente diferente al promedio. Esto sugiere un estilo de juego donde la conversión de oro en daño es una prioridad estratégica.")
+} else {
+  cat("A pesar de su éxito, la eficiencia de recursos de BLG no difiere significativamente del promedio. Su ventaja podría radicar en la obtención bruta de recursos más que en la eficiencia de su uso.")
+}
+@
+
+\subsection{Intervalos de confianza}
+Para ubicar el desempeño de Bilibili Gaming en el contexto global, calculamos los \textbf{intervalos de confianza del 95\%} para la media de cada métrica.
+\begin{itemize}
+    \item Las \textbf{barras negras} representan el rango donde se encuentra el verdadero promedio global con un 95\% de confianza.
+    \item El \textbf{punto rojo} indica el valor observado de Bilibili Gaming.
+\end{itemize}
+Si el punto rojo cae fuera de las barras, podemos afirmar con un 95\% de seguridad que BLG es significativamente diferente al promedio. Si cae dentro, su desempeño es estadísticamente normal.
+
+<<ci_visual, fig.cap="Comparación de BLG vs Intervalos de confianza globales (95\\%)", fig.height=4, fig.width=6>>=
+metrics <- c("KDA", "GoldPerMin", "Efficiency")
+ci_data <- data.frame()
+
+for(m in metrics) {
+  test <- t.test(datos[[m]])
+  blg_val <- mean(datos[[m]][datos$TeamName == "Bilibili Gaming"], na.rm=TRUE)
+  ci_data <- rbind(ci_data, data.frame(
+    Metric = m,
+    Mean_Global = test$estimate,
+    Lower = test$conf.int[1],
+    Upper = test$conf.int[2],
+    BLG_Mean = blg_val
+  ))
+}
+
+ggplot(ci_data, aes(x = Metric, y = Mean_Global)) +
+  geom_errorbar(aes(ymin = Lower, ymax = Upper), width = 0.2, size = 1) +
+  geom_point(size = 3, shape = 21, fill = "white") + # Media Global
+  geom_point(aes(y = BLG_Mean), size = 4, color = "red", shape = 18) + # BLG
+  theme_minimal() +
+  theme(axis.text.x = element_blank()) + # Eliminar texto redundante del eje X
+  labs(y = "Valor Promedio", x = "", title = "Global (Barras) vs BLG (Punto Rojo)") +
+  facet_wrap(~Metric, scales = "free_y")
+@
+
+\subsection{Regresión lineal y diagnóstico de residuos}
+Ajustamos un modelo de regresión lineal múltiple para cuantificar qué factores determinan el éxito (\textit{Win Rate}). El modelo propuesto es:
+$$ \text{Win\_rate} = \beta_0 + \beta_1 \cdot \text{KDA} + \beta_2 \cdot \text{GoldPerMin} + \beta_3 \cdot \text{Efficiency} + \epsilon $$
+
+<<regresion_diagnostico, fig.cap="Diagnóstico del modelo: Residuos y normalidad", fig.height=4, fig.width=8, results='asis'>>=
+model_final <- lm(Win_rate ~ KDA + GoldPerMin + Efficiency, data = datos)
+
+# Tabla de coeficientes
+coefs <- summary(model_final)$coefficients
+df_coefs <- data.frame(
+  Estimado = coefs[,1],
+  Error_Std = coefs[,2],
+  P_Valor = coefs[,4],
+  Signif = ifelse(coefs[,4] < 0.05, "*", "")
+)
+kable(df_coefs, format = "latex", booktabs = TRUE, digits = 4, caption = "Coeficientes del Modelo Final") %>%
+  kable_styling(latex_options = "hold_position")
+
+# Datos para gráficos con ggplot2
+diag_data <- data.frame(
+  Fitted = fitted(model_final),
+  Residuals = resid(model_final)
+)
+
+# 1. Residuos vs Ajustados (Homocedasticidad)
+p1 <- ggplot(diag_data, aes(x = Fitted, y = Residuals)) +
+  geom_point(alpha = 0.6, color = "blue") +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  geom_smooth(method = "loess", se = FALSE, color = "darkgray", size = 0.5) +
+  labs(title = "Residuos vs Valores ajustados", x = "Valores ajustados", y = "Residuos") +
+  theme_minimal()
+
+# 2. Q-Q Plot (Normalidad)
+p2 <- ggplot(diag_data, aes(sample = Residuals)) +
+  stat_qq(color = "blue", alpha = 0.6) +
+  stat_qq_line(color = "red", linetype = "dashed") +
+  labs(title = "Normal Q-Q Plot", x = "Cuantiles teóricos", y = "Cuantiles de la muestra") +
+  theme_minimal()
+
+grid.arrange(p1, p2, ncol = 2)
+
+cat("\n")
+cat(paste0("El modelo presenta un $R^2$ ajustado de ", round(summary(model_final)$adj.r.squared, 2), ". Esto significa que el 58\\% de la variabilidad en la tasa de victorias se explica por el KDA, el Oro y la Eficiencia."))
+@
+
+\begin{itemize}
+    \item \textbf{KDA (Positivo)}: Es el predictor más fuerte. Un mayor KDA está directamente asociado con un mayor Win Rate.
+    \item \textbf{GoldPerMin (Positivo)}: Acumular oro también incrementa la probabilidad de victoria, aunque su impacto es menor que el del KDA.
+    \item \textbf{Efficiency (Negativo)}: Curiosamente, el coeficiente es negativo. Esto podría deberse a la colinealidad con el Oro, o indicar que equipos que hacen "mucho daño con poco oro" (alta eficiencia) suelen ser equipos que van perdiendo y pelean desde atrás, mientras que los ganadores acumulan tanto oro que su eficiencia nominal baja.
+\end{itemize}
+
+Ahora es necesario que expliquemos qué quiere decir aquellos gráficos de la figura 5. El gráfico izquierdo nos muestra que la dispersión es aleatoria alrededor de 0, lo que valida la linealidad del modelo. El gráfico derecho nos muestra que los residuos siguen una distribución normal, lo que valida las pruebas de significancia del modelo.
+
+\subsection{Análisis de varianza (ANOVA)}
+Finalmente, realizamos una prueba ANOVA para verificar si la posición del jugador influye significativamente en la obtención de oro (\textit{GoldPerMin}).
+\begin{itemize}
+    \item $H_0$: El promedio de oro es igual para todas las posiciones.
+    \item $H_1$: Al menos una posición obtiene un promedio de oro diferente.
+\end{itemize}
+
+<<anova_test, results='asis'>>=
+anova_model <- aov(GoldPerMin ~ Position, data = datos)
+anova_res <- summary(anova_model)[[1]]
+
+# Crear tabla manual para kable
+df_anova <- data.frame(
+  Fuente = c("Posición", "Residuales"),
+  Df = anova_res$Df,
+  Sum_Sq = round(anova_res$`Sum Sq`, 0),
+  Mean_Sq = round(anova_res$`Mean Sq`, 0),
+  F_Value = c(round(anova_res$`F value`[1], 2), ""),
+  P_Value = c(format.pval(anova_res$`Pr(>F)`[1], digits=4, eps=0.0001), "")
+)
+
+# Renombrar columnas para evitar guiones bajos (que rompen LaTeX con escape=FALSE)
+colnames(df_anova) <- c("Fuente", "Df", "Sum Sq", "Mean Sq", "F Value", "P Value")
+
+# Corregir el símbolo < para LaTeX (evitar que salga como ¡)
+df_anova$`P Value` <- gsub("<", "$<$", df_anova$`P Value`)
+
+kable(df_anova, format = "latex", booktabs = TRUE, caption = "Tabla ANOVA: Oro por Posición", escape = FALSE) %>%
+  kable_styling(latex_options = "HOLD_position")
+
+cat("\n")
+if(anova_res$`Pr(>F)`[1] < 0.05) {
+  cat("El valor p es extremadamente bajo ($< 0.05$), por lo que rechazamos la hipótesis nula. Esto confirma estadísticamente que \\textbf{la posición determina la economía}: los carries (ADC, Mid) ganan significativamente más oro que los supports, lo cual es consistente con la estructura del juego.")
+} else {
+  cat("No se encontraron diferencias significativas entre posiciones.")
+}
 @
 
 \end{document}
