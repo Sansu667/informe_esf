@@ -12,7 +12,7 @@
 \renewcommand{\contentsname}{Contenido}
 
 \title{\textbf{Análisis del desempeño de Bilibili Gaming en el World Championship 2024 de League of Legends}}
-\author{Valentina Fonseca, Cristian Pérez, Edgar Santiago Suarez Alzate}
+\author{Valentina Fonseca, Cristian Pérez, Santiago Suarez}
 \date{\today}
 
 \begin{document}
