@@ -1,0 +1,18 @@
+# R and knitr artifacts
+*.tex
+*.log
+*.aux
+*.out
+*.toc
+*.synctex.gz
+*-concordance.tex
+
+# Generated figures
+figure/
+
+# Old/Backup files
+informe_worldcup_lol.Rnw
+
+# R data (keep the csv, but ignore workspace images)
+.RData
+.Rhistory
