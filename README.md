@@ -25,7 +25,6 @@ Se han incorporado nuevas técnicas para profundizar en el análisis:
 - **Eficiencia Normal**: Contrario a hipótesis iniciales, la eficiencia de recursos de BLG (0.50) fue estadísticamente normal y consistente con el perfil de un equipo campeón.
 - **Perfil de Campeón**: BLG no presentó debilidades estadísticas estructurales. Su derrota se atribuye a factores intangibles (estrategia, ejecución) más que a déficits numéricos.
 2.  **Métrica Personalizada**: Desarrollo del indicador de **Eficiencia de Recursos ($E_R$)**, que mide el daño infligido por unidad de oro gastada.
-    $$ E_R = \frac{\text{DamagePercent}}{\text{GoldPerMin}} \times 1000 $$
 3.  **Inferencia Estadística**:
     *   **Intervalos de Confianza (95%)**: Comparación del desempeño de BLG vs el promedio mundial.
     *   **Pruebas de Hipótesis**: T-tests para validar diferencias de rendimiento.
