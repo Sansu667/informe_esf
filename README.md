@@ -12,6 +12,18 @@ El informe fue generado utilizando **R** y **Knime/LaTeX** (`.Rnw`), integrando 
 
 ### Puntos Clave del Análisis:
 1.  **Estadística Descriptiva**: Análisis exploratorio de KDA, Oro por Minuto y Tasas de Victoria por equipo y posición.
+## Análisis Estadístico Avanzado
+Se han incorporado nuevas técnicas para profundizar en el análisis:
+- **ANOVA y Tukey HSD**: Para evaluar diferencias significativas en la obtención de oro entre posiciones.
+- **Árboles de Decisión**:
+  - **Regresión**: Para predecir el Win Rate basado en KDA, Oro y Eficiencia.
+  - **Clasificación**: Para determinar las reglas que separan la victoria de la derrota.
+- **Comparación de Modelos**: Evaluación del RMSE entre Regresión Lineal y Árboles.
+
+## Conclusiones Principales
+- **KDA es Rey**: Se confirmó que el KDA es el predictor más fuerte de la victoria. Un KDA > 6 asegura prácticamente la victoria.
+- **Eficiencia Normal**: Contrario a hipótesis iniciales, la eficiencia de recursos de BLG (0.50) fue estadísticamente normal y consistente con el perfil de un equipo campeón.
+- **Perfil de Campeón**: BLG no presentó debilidades estadísticas estructurales. Su derrota se atribuye a factores intangibles (estrategia, ejecución) más que a déficits numéricos.
 2.  **Métrica Personalizada**: Desarrollo del indicador de **Eficiencia de Recursos ($E_R$)**, que mide el daño infligido por unidad de oro gastada.
     $$ E_R = \frac{\text{DamagePercent}}{\text{GoldPerMin}} \times 1000 $$
 3.  **Inferencia Estadística**:

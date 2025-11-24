@@ -6,6 +6,7 @@
 \usepackage{booktabs}
 \usepackage{float}
 \usepackage{amsmath}
+\usepackage[T1]{fontenc}
 
 \renewcommand{\tablename}{Tabla}
 \renewcommand{\figurename}{Figura}
@@ -37,6 +38,8 @@ library(dplyr)
 library(ggplot2)
 library(kableExtra)
 library(gridExtra)
+library(rpart)
+library(rpart.plot)
 @
 
 <<importar_datos>>=
@@ -290,7 +293,7 @@ cat(paste0("El modelo presenta un $R^2$ ajustado de ", round(summary(model_final
 Ahora es necesario que expliquemos qué quiere decir aquellos gráficos de la figura 5. El gráfico izquierdo nos muestra que la dispersión es aleatoria alrededor de 0, lo que valida la linealidad del modelo. El gráfico derecho nos muestra que los residuos siguen una distribución normal, lo que valida las pruebas de significancia del modelo.
 
 \subsection{Análisis de varianza (ANOVA)}
-Finalmente, realizamos una prueba ANOVA para verificar si la posición del jugador influye significativamente en la obtención de oro (\textit{GoldPerMin}).
+Realizamos una prueba ANOVA para verificar si la posición del jugador influye significativamente en la obtención de oro (\textit{GoldPerMin}).
 \begin{itemize}
     \item $H_0$: El promedio de oro es igual para todas las posiciones.
     \item $H_1$: Al menos una posición obtiene un promedio de oro diferente.
@@ -323,5 +326,137 @@ if(anova_res$`Pr(>F)`[1] < 0.05) {
   cat("No se encontraron diferencias significativas entre posiciones.")
 }
 @
+
+\subsection{Prueba post-hoc de Tukey HSD}
+Dado que el ANOVA mostró diferencias significativas, aplicamos la prueba de Tukey HSD para identificar exactamente qué pares de posiciones difieren entre sí.
+
+<<tukey_hsd, results='asis'>>=
+tukey_res <- TukeyHSD(anova_model)
+tukey_df <- as.data.frame(tukey_res$Position)
+tukey_df$Comparison <- rownames(tukey_df)
+tukey_df <- tukey_df[, c("Comparison", "diff", "lwr", "upr", "p adj")]
+
+tukey_sig <- tukey_df %>% filter(`p adj` < 0.05)
+
+kable(tukey_sig, format = "latex", booktabs = TRUE, digits = 2, 
+      caption = "Diferencias significativas (Tukey HSD) en GPM entre posiciones") %>%
+  kable_styling(latex_options = "hold_position")
+
+cat("\n")
+cat("La tabla muestra solo las comparaciones que resultaron estadísticamente significativas. Se observa claramente que las posiciones de 'carry' (Adc, Mid) tienen diferencias positivas sustanciales de oro en comparación con el Support y, en menor medida, con el Jungle y Top.")
+@
+
+\section{Árboles de decisión}
+Para complementar el análisis lineal, implementamos modelos no paramétricos basados en árboles de decisión. Estos modelos nos permiten capturar relaciones no lineales e interacciones entre variables.
+
+\subsection{Árbol de regresión (predicción de Win Rate)}
+Ajustamos un árbol de regresión para predecir la tasa de victorias (\textit{Win\_rate}) utilizando las mismas variables que en la regresión lineal: KDA, GoldPerMin y Efficiency.
+
+<<arbol_regresion_calc>>=
+set.seed(123)
+tree_reg <- rpart(Win_rate ~ KDA + GoldPerMin + Efficiency, data = datos, method = "anova")
+
+opt_cp <- tree_reg$cptable[which.min(tree_reg$cptable[,"xerror"]),"CP"]
+tree_reg_pruned <- prune(tree_reg, cp = opt_cp)
+
+pred_reg <- predict(tree_reg_pruned, datos)
+rmse_tree <<- sqrt(mean((datos$Win_rate - pred_reg)^2))
+mae_tree <<- mean(abs(datos$Win_rate - pred_reg))
+@
+
+<<arbol_regresion_plot, fig.cap="Árbol de regresión podado para Win Rate", fig.height=5, fig.width=8>>=
+rpart.plot(tree_reg_pruned, main = "Árbol de regresión: Win Rate", type = 3, extra = 101, under = TRUE, faclen = 0)
+@
+
+<<print_rmse_text, results='asis'>>=
+cat(paste0("El árbol de regresión identifica los puntos de corte optimos en las variables predictoras. El error cuadrático medio (RMSE) del árbol es ", round(rmse_tree, 4), ".\n\n"))
+
+cat("Interpretación del árbol de regresión:\n")
+cat("\\begin{itemize}\n")
+cat("\\item \\textbf{Dominancia del KDA:} La variable más importante es el KDA. El primer corte se realiza en $KDA < 2.5$, separando a los jugadores con bajo rendimiento (Win Rate promedio $\\approx 0.23$) de los demas.\n")
+cat("\\item \\textbf{Alto rendimiento:} Los jugadores con $KDA \\ge 6.4$ tienen la mayor probabilidad de victoria (Win Rate $\\approx 0.76$). Esto confirma que mantener un KDA alto es el indicador más fuerte de éxito.\n")
+cat("\\item \\textbf{Rol de la eficiencia:} Para jugadores con KDA intermedio (entre 2.5 y 6.4), la Eficiencia ($E_R$) juega un papel secundario para refinar la predicción.\n")
+cat("\\end{itemize}\n")
+@
+
+\subsection{Árbol de clasificación (Ganar vs Perder)}
+Transformamos la variable continua \textit{Win\_rate} en una variable binaria \textit{Result} (Win si Win\_rate > 0.5, Loss en caso contrario) para entrenar un árbol de clasificación.
+
+<<arbol_clasificacion, fig.cap="Árbol de clasificación podado", fig.height=5, fig.width=8>>=
+datos$Result <- ifelse(datos$Win_rate > 0.5, "Win", "Loss")
+datos$Result <- as.factor(datos$Result)
+
+tree_class <- rpart(Result ~ KDA + GoldPerMin + Efficiency, data = datos, method = "class")
+
+opt_cp_class <- tree_class$cptable[which.min(tree_class$cptable[,"xerror"]),"CP"]
+tree_class_pruned <- prune(tree_class, cp = opt_cp_class)
+
+rpart.plot(tree_class_pruned, main = "Árbol de clasificación: Win/Loss", type = 3, extra = 104, under = TRUE, faclen = 0)
+
+pred_class <- predict(tree_class_pruned, datos, type = "class")
+conf_matrix <- table(Real = datos$Result, Predicho = pred_class)
+accuracy <<- sum(diag(conf_matrix)) / sum(conf_matrix)
+@
+
+<<print_accuracy_text, results='asis'>>=
+cat(paste0("La precisión del árbol de clasificación es del ", round(accuracy * 100, 2), "% Este modelo nos permite visualizar reglas de decisión claras:\n\n"))
+
+cat("\\begin{itemize}\n")
+cat("\\item \\textbf{Regla de victoria segura:} Si $KDA \\ge 6$, el modelo predice \\textbf{victoria} con una probabilidad muy alta (cercana al 100\\%).\n")
+cat("\\item \\textbf{Zona de riesgo:} Si $KDA < 3.7$, la probabilidad de \\textbf{derrota} es muy alta (superior al 90\\%).\n")
+cat("\\item \\textbf{Zona intermedia:} Entre KDA 3.7 y 6, el resultado es más incierto y depende de la Eficiencia. Si la eficiencia es baja ($< 0.65$), aun es probable ganar, quizás indicando partidas largas donde se acumula mucho oro pero el KDA no es estelar.\n")
+cat("\\end{itemize}\n")
+@
+
+\section{Comparación de modelos}
+Finalmente, comparamos el desempeño predictivo del modelo de regresión lineal múltiple y el árbol de regresión.
+
+<<comparacion_modelos, results='asis'>>=
+pred_lm <- predict(model_final, datos)
+rmse_lm <- sqrt(mean((datos$Win_rate - pred_lm)^2))
+
+comparacion <- data.frame(
+  Modelo = c("Regresión lineal múltiple", "Árbol de regresión"),
+  RMSE = c(rmse_lm, rmse_tree),
+  Interpretación = c("Relaciones lineales directas", "Interacciones y cortes no lineales")
+)
+
+kable(comparacion, format = "latex", booktabs = TRUE, digits = 4, 
+      caption = "Comparación de modelos predictivos (Win Rate)") %>%
+  kable_styling(latex_options = "hold_position")
+
+cat("\n")
+if(rmse_tree < rmse_lm) {
+  cat(paste0("El árbol de regresión presenta un menor error (RMSE = ", round(rmse_tree, 4), ") comparado con la regresión lineal (RMSE = ", round(rmse_lm, 4), "). Esto sugiere que las relaciones entre las métricas de juego y la victoria no son puramente lineales y que existen umbrales críticos."))
+} else {
+  cat(paste0("La regresión lineal presenta un menor error (RMSE = ", round(rmse_lm, 4), ") comparado con el árbol de regresión (RMSE = ", round(rmse_tree, 4), "). Esto indica que una aproximación lineal es suficiente y más robusta para explicar la variabilidad en la tasa de victorias en este conjunto de datos."))
+}
+@
+
+\section{Conclusiones}
+
+El objetivo de este informe fue analizar los factores que pudieron influir en que Bilibili Gaming no lograra obtener el campeonato mundial de League of Legends 2024. El análisis, que combinó regresión lineal, árboles de decisión e intervalos de confianza, reveló que el desempeño de BLG fue estadísticamente sobresaliente y consistente con el de un equipo campeón, desafiando la noción de que existieron fallas numéricas estructurales en su juego.
+
+\subsection{Factores clave de influencia}
+
+\textbf{Dominio del KDA como predictor de victoria:}
+Los modelos de predicción confirmaron que el KDA es el indicador más potente del éxito competitivo.
+\begin{itemize}
+    \item Árbol de regresión: Estima que los jugadores con un KDA > 6.4 alcanzan una tasa de victorias promedio del 76\%.
+    \item Árbol de clasificación: Indica que superar un KDA de 6 es el umbral crítico para ser clasificado como "Ganador" con una certeza casi absoluta.
+    \item El KDA de BLG fue alto (4.12), ubicándose estadísticamente por encima del promedio global. Esto confirma que el equipo tuvo un desempeño ofensivo y de supervivencia de élite.
+\end{itemize}
+
+\textbf{Análisis de la eficiencia de recursos ($E_R$):}
+Contrario a la hipótesis inicial de una posible ineficiencia, los datos demuestran robustez en este aspecto:
+\begin{itemize}
+    \item El valor de eficiencia de BLG fue de 0.50, muy cercano al promedio global de 0.52. Al caer dentro del intervalo de confianza global, se confirma que BLG no fue significativamente menos eficiente que el promedio.
+    \item El modelo de regresión mostró que los equipos ganadores tienden a tener eficiencias nominales ligeramente menores debido a la gran acumulación de oro. El desempeño de BLG es perfectamente consistente con este patrón, indicando una gestión de recursos normal para un equipo de su calibre.
+\end{itemize}
+
+\subsection{Conclusión final}
+El análisis estadístico revela que Bilibili Gaming presentó un perfil de rendimiento de élite, sin debilidades numéricas significativas en las métricas evaluadas. Su KDA fue superior al promedio y su eficiencia de recursos fue estadísticamente normal, comportándose como se espera de un equipo ganador.
+
+Por lo tanto, la incapacidad de asegurar el campeonato no puede atribuirse a un déficit en las métricas de desempeño individual o económico. La evidencia sugiere que la derrota en la final se debió a factores intangibles no capturados por estas variables estadísticas, como la toma de decisiones en momentos críticos, la estrategia de selección de campeones (draft) o la ejecución táctica en partidas específicas. Estadísticamente, BLG tuvo el desempeño de un campeón mundial.
 
 \end{document}
